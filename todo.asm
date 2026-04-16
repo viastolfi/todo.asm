@@ -26,43 +26,51 @@ _start:
   mov rdi, db_name
   call _strcpy
 
-  mov rbx, db_name
   ;add .db extension to db file
+  mov rbx, db_name
   call _strcat
-
   mov rbx, rax
 
-  ;open/create db file
+  ;open db file
   mov rax, SYS_OPEN
   mov rdi, rbx
-  mov rsi, O_CREAT|O_RDWR|O_TRUNC
-  mov rdx, S_IRUSR|S_IWUSR
+  mov rsi, O_RDWR
+  mov rdx, 0
   syscall
 
+  ;check if db file exist or not
   cmp rax, 0
-  jl _file_error
+  jl _file_error_handling
 
-  mov rsi, rbx
+  ;create memory to store the fd and store it
+  sub rsp, 8
+  mov [rsp + 8], rax
+
+  ;get the size of the db file
+  mov rdi, rbx
   call _strlen
   mov rcx, rax
-
+ 
+  ;print the opened / created db file to stdout
   mov rax, SYS_WRITE
   mov rdi, 1
   mov rsi, rbx
   mov rdx, rcx
   syscall
 
-  mov rbx, rax
+  ;close the file
+  mov rbx, [rsp + 8]
   mov rax, SYS_CLOSE
   mov rdi, rbx
   syscall
 
   call _program_end
 
+;;  int strlen(char* s)
 _strlen:
   xor rcx, rcx
 len:
-  cmp byte[rsi + rcx], 0
+  cmp byte[rdi + rcx], 0
   je len_done
   inc rcx
   jmp len
@@ -70,6 +78,7 @@ len_done:
   mov rax, rcx
   ret 
 
+;; void strcpy(char* src, char* dest)
 _strcpy:
 copy:
   mov al, [rsi]
@@ -82,6 +91,8 @@ copy:
 done:
   ret
 
+;; char* strcat(char* s1, char* s2)
+;; copy s2 at the end of s1
 _strcat:
   mov rdi, rbx ; keep the beggining of the string in rdi
   mov rsi, file_extension
@@ -100,6 +111,18 @@ concat:
   jmp concat
 finish:
   mov rax, rdi ; return the beggining of the string
+  ret
+ 
+_file_error_handling:
+  neg rax
+  cmp rax, 2
+  jne _file_error
+  
+  mov rax, SYS_OPEN
+  mov rdi, rbx
+  mov rsi, O_RDWR|O_CREAT|O_TRUNC
+  mov rdx, S_IRUSR|S_IWUSR
+  syscall
   ret
 
 _file_error:
