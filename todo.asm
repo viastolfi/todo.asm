@@ -42,12 +42,33 @@ _start:
   cmp rax, 0
   jl _file_error
 
+  mov rsi, rbx
+  call _strlen
+  mov rcx, rax
+
+  mov rax, SYS_WRITE
+  mov rdi, 1
+  mov rsi, rbx
+  mov rdx, rcx
+  syscall
+
   mov rbx, rax
   mov rax, SYS_CLOSE
   mov rdi, rbx
   syscall
 
   call _program_end
+
+_strlen:
+  xor rcx, rcx
+len:
+  cmp byte[rsi + rcx], 0
+  je len_done
+  inc rcx
+  jmp len
+len_done:
+  mov rax, rcx
+  ret 
 
 _strcpy:
 copy:
