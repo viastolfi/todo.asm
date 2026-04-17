@@ -1,5 +1,8 @@
 ; Linux Syscall + flags
 
+; BASICS
+%define STDIN_FILENO    0
+
 ; Syscall
 %define SYS_OPEN        2
 %define SYS_EXIT        60
@@ -51,6 +54,20 @@ raw_termios: istruc TERMIOS
   at c_lflag, dd 0
   at c_cc,    db ""
 iend
+
+%macro syscall1 2
+  mov rax, %1
+  mov rdi, %2
+  syscall
+%endmacro
+
+%macro syscall3 4
+  mov rax, %1
+  mov rdi, %2
+  mov rsi, %3
+  mov rdx, %4
+  syscall
+%endmacro
 
 %macro funcall1 2
   mov rdi, %2
