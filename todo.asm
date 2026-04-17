@@ -26,17 +26,14 @@ _start:
   jl _usage_error
 
   ;get db name and check if file exist
-  mov rdi, db_name
-  mov rsi, [rsp + 16]
-  call _strcpy
+  funcall2 _strcpy, db_name, [rsp + 16]
 
 .db_file_opening:
   ;create memory to store the fd and store it
   sub rsp, 16
 
   ;add .db extension to db file
-  mov rbx, db_name
-  call _strcat
+  funcall2 _strcat, db_name, file_extension
   ;store the file name in the stack
   mov [rsp + 8], rax
 

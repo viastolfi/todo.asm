@@ -33,22 +33,21 @@ done:
 ;; rdi - char* s1
 ;; rsi - char* s2
 _strcat:
-  mov rdi, rbx ; keep the beggining of the string in rdi
-  mov rsi, file_extension
+  mov rbx, rdi; keep the beggining of the string in rdi
 parse:
-  cmp byte [rbx], 0
+  cmp byte [rdi], 0
   je concat
-  inc rbx
+  inc rdi 
   jmp parse
 concat:
   cmp byte[rsi], 0
   je finish
   mov cl, byte[rsi]
-  mov byte[rbx], cl
-  inc rbx
+  mov byte[rdi], cl
+  inc rdi
   inc rsi
   jmp concat
 finish:
-  mov rax, rdi ; return the beggining of the string
+  mov rax, rbx; return the beggining of the string
   ret
  
