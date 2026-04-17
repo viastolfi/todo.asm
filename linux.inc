@@ -18,9 +18,47 @@
 %define O_TRUNC         512
 %define O_APPEND        1024
 
-;Stat flags
+; Stat flags
 %define S_IRUSR         0o400
 %define S_IWUSR         0o200
 %define S_IXUSR         0o100
 
 %define S_IRWXU         0o700
+
+; Termios definition
+struc TERMIOS
+  c_iflag: resd 1   ; input modes
+  c_oflag: resd 1   ; output modes
+  c_cflag: resd 1   ; control modes
+  c_lflag: resd 1   ; local modes
+  c_cc:    resb 255 ; special characters
+endstruc
+
+; Stored termios value for restoration 
+orig_termios: istruc TERMIOS
+  at c_iflag, dd 0
+  at c_oflag, dd 0
+  at c_cflag, dd 0
+  at c_lflag, dd 0
+  at c_cc,    db ""
+iend
+
+; termios value we will modified
+raw_termios: istruc TERMIOS
+  at c_iflag, dd 0
+  at c_oflag, dd 0
+  at c_cflag, dd 0
+  at c_lflag, dd 0
+  at c_cc,    db ""
+iend
+
+%macro funcall1 2
+  mov rdi, %2
+  call %1
+%endmacro
+
+%macro funcall2 3
+  mov rdi, %2
+  mov rsi, %3
+  call %1
+%endmacro

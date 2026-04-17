@@ -12,11 +12,13 @@ section .data
 section .bss
   db_name resb 256
   buffer resb 256
+  input_char resb 1
 
 section .text
 global _start
 
 _start:
+.arg_reading:
   ;get the argc and check it's at least than two
   mov rbx, [rsp]
   cmp rbx, 2
@@ -27,7 +29,7 @@ _start:
   mov rdi, db_name
   call _strcpy
 
-.start_chunk2:
+.db_file_opening:
   ;create memory to store the fd and store it
   sub rsp, 16
 
@@ -46,12 +48,10 @@ _start:
 
   ;check if db file exist or not
   cmp rax, 0
-  jge .start_chunk3
-  mov rdi, rax
-  mov rsi, [rsp + 8]
-  call _file_error_handling
+  jge .db_file_reading
+  funcall2 _file_error_handling, rax, [rsp + 8]
 
-.start_chunk3:
+.db_file_reading:
   ;store the file descriptor
   mov [rsp + 16], rax
   ;read the content of the file and print it
@@ -64,17 +64,6 @@ _start:
   mov rdi, buffer
   call _strlen
   mov rbx, rax
-
-  mov rax, SYS_WRITE
-  mov rdi, 1
-  mov rsi, buffer
-  mov rdx, rbx
-  syscall
-
-  ;close the file
-  mov rax, SYS_CLOSE
-  mov rdi, [rsp + 16]
-  syscall
 
   call _program_end
 
@@ -125,6 +114,11 @@ finish:
   mov rax, rdi ; return the beggining of the string
   ret
  
+; Check if a file error is due to file not existing
+; Create it if so
+; Exit with error otherwise
+;; rdi => file OPEN syscall error
+;; rsi => file name
 _file_error_handling:
   neg rdi
   cmp rdi, 2
@@ -159,6 +153,12 @@ _program_end_error:
   syscall
 
 _program_end:
+  ;TODO: maybe store db_fd in bss section to avoid stack usage error
+  ;close the file
+  mov rax, SYS_CLOSE
+  mov rdi, [rsp + 16]
+  syscall
+
   mov rax, SYS_EXIT
   mov rdi, 0
   syscall 
