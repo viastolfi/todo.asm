@@ -11,6 +11,7 @@ section .data
 
 section .bss
   db_name resb 256
+  buffer resb 256
 
 section .text
 global _start
@@ -26,42 +27,53 @@ _start:
   mov rdi, db_name
   call _strcpy
 
+.start_chunk2:
+  ;create memory to store the fd and store it
+  sub rsp, 16
+
   ;add .db extension to db file
   mov rbx, db_name
   call _strcat
-  mov rbx, rax
+  ;store the file name in the stack
+  mov [rsp + 8], rax
 
   ;open db file
   mov rax, SYS_OPEN
-  mov rdi, rbx
+  mov rdi, [rsp + 8]
   mov rsi, O_RDWR
   mov rdx, 0
   syscall
 
   ;check if db file exist or not
   cmp rax, 0
-  jl _file_error_handling
+  jge .start_chunk3
+  mov rdi, rax
+  mov rsi, [rsp + 8]
+  call _file_error_handling
 
-  ;create memory to store the fd and store it
-  sub rsp, 8
-  mov [rsp + 8], rax
+.start_chunk3:
+  ;store the file descriptor
+  mov [rsp + 16], rax
+  ;read the content of the file and print it
+  mov rax, SYS_READ
+  mov rdi, [rsp + 16]
+  mov rsi, buffer
+  mov rdx, 256
+  syscall
 
-  ;get the size of the db file
-  mov rdi, rbx
+  mov rdi, buffer
   call _strlen
-  mov rcx, rax
- 
-  ;print the opened / created db file to stdout
+  mov rbx, rax
+
   mov rax, SYS_WRITE
   mov rdi, 1
-  mov rsi, rbx
-  mov rdx, rcx
+  mov rsi, buffer
+  mov rdx, rbx
   syscall
 
   ;close the file
-  mov rbx, [rsp + 8]
   mov rax, SYS_CLOSE
-  mov rdi, rbx
+  mov rdi, [rsp + 16]
   syscall
 
   call _program_end
@@ -114,12 +126,12 @@ finish:
   ret
  
 _file_error_handling:
-  neg rax
-  cmp rax, 2
+  neg rdi
+  cmp rdi, 2
   jne _file_error
   
   mov rax, SYS_OPEN
-  mov rdi, rbx
+  mov rdi, rsi
   mov rsi, O_RDWR|O_CREAT|O_TRUNC
   mov rdx, S_IRUSR|S_IWUSR
   syscall
