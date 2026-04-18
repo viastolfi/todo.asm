@@ -10,6 +10,7 @@
 %define SYS_STAT        4
 %define SYS_CLOSE       3
 %define SYS_READ        0
+%define SYS_IOCTL       16
 
 ; Flags
 
@@ -28,6 +29,30 @@
 
 %define S_IRWXU         0o700
 
+; Ioctl flags 
+%define TCGETS    0x5401
+%define TCSETS    0x5402
+
+; Ioctl c_iflag
+%define IGNBRK    0x01
+%define BRKINT    0x02
+%define PARMRK    0x08
+%define ISTRIP    0x20
+%define INLCR     0x40
+%define IGNCR     0x80
+%define ICRNL     0x100
+%define IXON      0x400
+
+; Ioctl c_oflag
+%define OPOST     0x01
+
+; Ioctl c_lflag
+%define ECHO      0x08
+%define ECHONL    0x40
+%define ICANON    0x02
+%define ISIG      0x01
+%define IEXTEN    0x8000
+
 ; Termios definition
 struc TERMIOS
   c_iflag: resd 1   ; input modes
@@ -36,24 +61,6 @@ struc TERMIOS
   c_lflag: resd 1   ; local modes
   c_cc:    resb 255 ; special characters
 endstruc
-
-; Stored termios value for restoration 
-orig_termios: istruc TERMIOS
-  at c_iflag, dd 0
-  at c_oflag, dd 0
-  at c_cflag, dd 0
-  at c_lflag, dd 0
-  at c_cc,    db ""
-iend
-
-; termios value we will modified
-raw_termios: istruc TERMIOS
-  at c_iflag, dd 0
-  at c_oflag, dd 0
-  at c_cflag, dd 0
-  at c_lflag, dd 0
-  at c_cc,    db ""
-iend
 
 %macro syscall1 2
   mov rax, %1
@@ -78,4 +85,12 @@ iend
   mov rdi, %2
   mov rsi, %3
   call %1
+%endmacro
+
+%macro get_termios 1
+  syscall3 SYS_IOCTL, STDIN_FILENO, TCGETS, %1
+%endmacro
+
+%macro set_termios 1
+  syscall3 SYS_IOCTL, STDIN_FILENO, TCSETS, %1
 %endmacro

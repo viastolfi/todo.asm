@@ -10,6 +10,24 @@ section .data
 
   file_extension db ".db", 0
 
+  ; Stored termios value for restoration 
+  orig_termios: istruc TERMIOS
+    at c_iflag, dd 0
+    at c_oflag, dd 0
+    at c_cflag, dd 0
+    at c_lflag, dd 0
+    at c_cc,    db ""
+  iend
+
+  ; termios value we will modified
+  raw_termios: istruc TERMIOS
+    at c_iflag, dd 0
+    at c_oflag, dd 0
+    at c_cflag, dd 0
+    at c_lflag, dd 0
+    at c_cc,    db ""
+  iend
+
 section .bss
   db_name resb 256
   buffer resb 256
@@ -52,9 +70,52 @@ _start:
   syscall3 SYS_READ, [rsp + 16], buffer, 256
 
 .enable_raw_mode:
-  call _program_end
+  get_termios orig_termios
+  get_termios raw_termios
+
+  ;set c_iflag
+  mov r15, IGNBRK
+  or  r15, BRKINT
+  or  r15, PARMRK
+  or  r15, ISTRIP
+  or  r15, INLCR
+  or  r15, IGNCR
+  or  r15, ICRNL
+  or  r15, IXON
+  not r15
+  mov r14, [rel raw_termios + c_iflag]
+  and r14, r15
+  mov [rel raw_termios + c_iflag], r14
+
+  ;set c_oflag
+  mov r15, OPOST
+  not r15
+  mov r14, [rel raw_termios + c_oflag]
+  and r14, r15
+  mov [rel raw_termios + c_oflag], r14
+
+  ;set c_lflag
+  mov r15, ECHO
+  or  r15, ECHONL
+  or  r15, ICANON
+  or  r15, ISIG
+  or  r15, IEXTEN
+  not r15
+  mov r14, [rel raw_termios + c_lflag]
+  and r14, r15
+  mov [rel raw_termios + c_lflag], r14
+
+
+  set_termios raw_termios
+  call _main_loop
 
 _main_loop:
+  syscall3 SYS_READ, STDIN_FILENO, input_char, 1
+  cmp byte[rel input_char], 113
+  je _program_end
+
+  syscall3 SYS_WRITE, 1, input_char, 1
+  jmp _main_loop
 
 ; Check if a file error is due to file not existing
 ; Create it if so
@@ -84,5 +145,8 @@ _program_end:
   ;TODO: maybe store db_fd in bss section to avoid stack usage error
   ;close the file
   syscall1 SYS_CLOSE, [rsp + 16]
+
+  ; reset termios to its base state
+  set_termios orig_termios
 
   syscall1 SYS_EXIT, 0
