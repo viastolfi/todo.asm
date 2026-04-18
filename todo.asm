@@ -10,6 +10,23 @@ section .data
 
   file_extension db ".db", 0
 
+  clear_term_msg db 27,"[2J",27,"[H"
+  clear_term_len equ  $ - clear_term_msg
+
+  hide_cursor_msg db 27,"[?25l"
+  hide_cursor_len equ $ - hide_cursor_msg
+
+  show_cursor_msg db 27,"[?25h"
+  show_cursor_len equ $ - show_cursor_msg
+
+  selected_todos_msg db "> ", 0
+  none_selected_todos_msg db "  ", 0
+
+  newline db 10, 0
+
+  open_state_msg db "[ ] ", 0
+  close_state_msg db "[X] ", 0
+
   ; Stored termios value for restoration 
   orig_termios: istruc TERMIOS
     at c_iflag, dd 0
@@ -29,9 +46,13 @@ section .data
   iend
 
 section .bss
-  db_name resb 256
-  buffer resb 256
-  input_char resb 1
+  db_name resb        256
+  db_content resb     256
+  db_size resq        1
+  input_char resb     1
+
+  todos_cursor  resb  1
+  todos_content resb  257 * 10
 
 section .text
 global _start
@@ -48,26 +69,28 @@ _start:
 
 .db_file_opening:
   ;create memory to store the fd and store it
-  sub rsp, 16
+  sub rsp, 32
 
   ;add .db extension to db file
   funcall2 _strcat, db_name, file_extension
   ;store the file name in the stack
-  mov [rsp + 8], rax
+  mov [rsp], rax
 
   ;open db file
-  syscall3 SYS_OPEN, [rsp + 8], O_RDWR, 0
+  syscall3 SYS_OPEN, [rsp], O_RDWR, 0
 
   ;check if db file exist or not
   cmp rax, 0
   jge .db_file_reading
-  funcall2 _file_error_handling, rax, [rsp + 8]
+  funcall2 _file_error_handling, rax, [rsp]
 
 .db_file_reading:
   ;store the file descriptor
-  mov [rsp + 16], rax
+  mov [rsp + 8], rax
   ;read the content of the file
-  syscall3 SYS_READ, [rsp + 16], buffer, 256
+  syscall3 SYS_READ, [rsp + 8], db_content, 256
+  ;store the size of the content
+  mov [rel db_size], rax
 
 .enable_raw_mode:
   get_termios orig_termios
@@ -86,13 +109,6 @@ _start:
   mov r14, [rel raw_termios + c_iflag]
   and r14, r15
   mov [rel raw_termios + c_iflag], r14
-
-  ;set c_oflag
-  mov r15, OPOST
-  not r15
-  mov r14, [rel raw_termios + c_oflag]
-  and r14, r15
-  mov [rel raw_termios + c_oflag], r14
 
   ;set c_lflag
   mov r15, ECHO
@@ -119,15 +135,170 @@ _start:
   mov [rel raw_termios + c_cflag], r14
 
   set_termios raw_termios
+
+  ;hide cursor
+  syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
+
+  call _load_todos_content
+  mov [rel todos_cursor], 0
   call _main_loop
 
 _main_loop:
+  syscall3 SYS_WRITE, 1, clear_term_msg, clear_term_len
+
+  funcall1 _strlen, todos_content
+  mov r12, rax
+  syscall3 SYS_WRITE, 1, todos_content, r12
+
   syscall3 SYS_READ, STDIN_FILENO, input_char, 1
   cmp byte[rel input_char], 113
   je _program_end
 
-  syscall3 SYS_WRITE, 1, input_char, 1
+  cmp byte[rel input_char], 106
+  je .increase_cursor
+
+  cmp byte[rel input_char], 107
+  je .decrease_cursor
+
   jmp _main_loop
+
+.decrease_cursor:
+  movzx r9, byte[rel todos_cursor]
+  cmp r9, 0
+  je _main_loop
+
+  mov rdi, r9
+  dec r9
+  mov [rel todos_cursor], r9b
+  call _update_cursor_content
+  jmp _main_loop
+
+.increase_cursor:
+  movzx r9, byte[rel todos_cursor]
+  mov rdi , r9
+  inc r9
+  mov [rel todos_cursor], r9b
+  call _update_cursor_content
+  jmp _main_loop
+
+;; update cursor in the UI
+;; rdi => old cursor
+_update_cursor_content:
+  lea r9, [rel todos_content]
+  mov r12, 0
+  jmp .cursor_comp
+
+.tweaks_increase:
+  inc r9
+.cursor_comp:
+  cmp rdi, r12
+  je .erase_cursor
+
+  cmp [rel todos_cursor], r12b
+  je .add_cursor
+
+.update_loop:   
+  mov al, [r9]
+  cmp al, 10
+  je .tweaks_increase
+
+  cmp al, 0
+  je .cursor_done
+
+  inc r9
+  jmp .update_loop
+
+.add_cursor:
+  mov [r9], 62
+  inc r12
+  jmp .update_loop
+
+.erase_cursor:
+  mov [r9], 32
+  inc r12
+  jmp .update_loop
+
+.cursor_done:
+  ret
+
+_load_todos_content:
+  ;; state... title
+  ;; ^        ^
+  ;; 1byte    256byte  
+  ;; state is 0 or 1 (open or close)
+  ;; eg: 0todo test
+  ;; each entry separated by '\n'
+
+  lea r9, [rel db_content] ; store the beginning of the content
+  mov r12, 0  ; parsing cursor
+
+.cursor_parsing:
+  cmp [rel todos_cursor], r12
+  je  .add_selected_char
+  jmp .add_none_selected_char
+
+.add_selected_char:
+  funcall2 _strcat, todos_content, selected_todos_msg
+  jmp .state_parsing
+
+.add_none_selected_char:
+  funcall2 _strcat, todos_content, none_selected_todos_msg
+
+.state_parsing:
+  inc r12
+  mov al, [r9]
+
+  cmp al, 0
+  je .parsing_done
+
+  cmp al, 48
+  je .add_open_char
+  cmp al, 49
+  je .add_close_char
+
+  inc r9
+  jmp .state_parsing
+
+.add_open_char:
+  funcall2 _strcat, todos_content, open_state_msg
+  jmp .after_state
+.add_close_char:
+  funcall2 _strcat, todos_content, close_state_msg
+  jmp .after_state
+  
+.after_state:
+  inc r9
+  mov r10, r9
+
+.content_loop:
+  mov al, [r9]
+
+  cmp al, 10
+  je .end_of_line
+
+  cmp al, 0
+  je .end_of_file
+
+  inc r9
+  jmp .content_loop
+
+.end_of_line:
+  mov byte [r9], 0
+
+  funcall2 _strcat, todos_content, r10
+  funcall2 _strcat, todos_content, newline
+
+  inc r9
+  jmp .cursor_parsing
+
+.end_of_file:
+  cmp r10, r9
+  je .parsing_done
+
+  funcall2 _strcat, todos_content, r10
+
+.parsing_done:
+  ret
 
 ; Check if a file error is due to file not existing
 ; Create it if so
@@ -156,7 +327,10 @@ _program_end_error:
 _program_end:
   ;TODO: maybe store db_fd in bss section to avoid stack usage error
   ;close the file
-  syscall1 SYS_CLOSE, [rsp + 16]
+  syscall1 SYS_CLOSE, [rsp + 8]
+
+  ;show cursor
+  syscall3 SYS_WRITE, 1, show_cursor_msg, show_cursor_len
 
   ; reset termios to its base state
   set_termios orig_termios
