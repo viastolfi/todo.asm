@@ -53,13 +53,18 @@
 %define ISIG      0x01
 %define IEXTEN    0x8000
 
+; Ioctl c_cflag
+%define CSIZE     0x30
+%define PARENB    0x100
+%define CS8       0x30
+
 ; Termios definition
 struc TERMIOS
   c_iflag: resd 1   ; input modes
   c_oflag: resd 1   ; output modes
   c_cflag: resd 1   ; control modes
   c_lflag: resd 1   ; local modes
-  c_cc:    resb 255 ; special characters
+  c_cc:    resb 32 ; special characters
 endstruc
 
 %macro syscall1 2

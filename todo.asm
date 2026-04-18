@@ -105,6 +105,18 @@ _start:
   and r14, r15
   mov [rel raw_termios + c_lflag], r14
 
+  ;set c_cflag
+  mov r15, CSIZE
+  or  r15, PARENB
+  not r15
+  mov r14, [rel raw_termios + c_cflag]
+  and r14, r15
+  mov [rel raw_termios + c_cflag], r14
+
+  mov r15, CS8
+  mov r14, [rel raw_termios + c_cflag]
+  or  r14, r15 
+  mov [rel raw_termios + c_cflag], r14
 
   set_termios raw_termios
   call _main_loop
