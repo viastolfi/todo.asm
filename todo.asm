@@ -52,7 +52,8 @@ section .bss
   db_name resb        256
   db_content resb     256
   db_size resq        1
-  db_fd resq 1
+  db_fd resq          1
+  db_line resq        1
 
   input_char resb       1
   input_todo_title resq 256
@@ -145,6 +146,7 @@ _start:
   ;hide cursor
   syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
 
+  mov [rel db_line], 0
   call _load_todos_content
   mov [rel todos_cursor], 0
   call _main_loop
@@ -183,6 +185,7 @@ _main_loop:
   syscall3 SYS_WRITE, 1, clear_term_msg, clear_term_len
   set_termios orig_termios
   
+  syscall3 SYS_WRITE, 1, show_cursor_msg, show_cursor_len
   syscall3 SYS_WRITE, 1, get_input_msg, get_input_len
   syscall3 SYS_READ, STDIN_FILENO, input_todo_title, 256
 
@@ -207,6 +210,7 @@ _main_loop:
   mov r9, rax
   mov byte [r12 + r9 - 1], 0
 .add_new_todo_done:
+  syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
   set_termios raw_termios
   jmp _main_loop
 
@@ -282,6 +286,10 @@ _main_loop:
 
 .increase_cursor:
   movzx r9, byte[rel todos_cursor]
+
+  cmp r9, [rel db_line]
+  je _main_loop
+  
   mov rdi , r9
   inc r9
   mov [rel todos_cursor], r9b
@@ -298,6 +306,7 @@ _update_cursor_content:
   jmp .cursor_comp
 
 .tweaks_increase:
+  inc r12
   inc r9
 .cursor_comp:
   cmp rdi, r12
@@ -319,12 +328,10 @@ _update_cursor_content:
 
 .add_cursor:
   mov [r9], 62
-  inc r12
   jmp .update_loop
 
 .erase_cursor:
   mov [r9], 32
-  inc r12
   jmp .update_loop
 
 .cursor_done:
@@ -399,6 +406,7 @@ _load_todos_content:
   funcall2 _strcat, todos_content, r10
   funcall2 _strcat, todos_content, newline
 
+  inc [rel db_line]
   inc r9
   jmp .cursor_parsing
 
