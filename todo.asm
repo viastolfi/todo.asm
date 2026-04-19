@@ -27,6 +27,9 @@ section .data
   open_state_msg db "[ ] ", 0
   close_state_msg db "[X] ", 0
 
+  get_input_msg db "Enter title of new todo : ", 0
+  get_input_len equ $ - get_input_msg
+
   ; Stored termios value for restoration 
   orig_termios: istruc TERMIOS
     at c_iflag, dd 0
@@ -51,7 +54,8 @@ section .bss
   db_size resq        1
   db_fd resq 1
 
-  input_char resb     1
+  input_char resb       1
+  input_todo_title resq 256
 
   todos_cursor  resb  1
   todos_content resb  257 * 10
@@ -168,6 +172,42 @@ _main_loop:
   cmp byte[rel input_char], 111
   je .update_todo_state
 
+  cmp byte[rel input_char], 97
+  je .add_new_todo
+
+  jmp _main_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.add_new_todo:
+  syscall3 SYS_WRITE, 1, clear_term_msg, clear_term_len
+  set_termios orig_termios
+  
+  syscall3 SYS_WRITE, 1, get_input_msg, get_input_len
+  syscall3 SYS_READ, STDIN_FILENO, input_todo_title, 256
+
+  mov r9, rax ; keep len read
+  mov byte [input_todo_title + r9], 0
+
+  lea r10, [rel todos_content]
+  mov r12, r10
+  funcall1 _strlen, r10
+  mov r11, rax
+
+  add r10, r11
+  mov byte [r10], 10
+  inc r10
+  mov byte [r10], 0
+
+  funcall2 _strcat, r12, none_selected_todos_msg
+  funcall2 _strcat, r12, open_state_msg
+  funcall2 _strcat, r12, input_todo_title
+
+  funcall1 _strlen, r12
+  mov r9, rax
+  mov byte [r12 + r9 - 1], 0
+.add_new_todo_done:
+  set_termios raw_termios
   jmp _main_loop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
