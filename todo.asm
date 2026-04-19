@@ -160,7 +160,67 @@ _main_loop:
   cmp byte[rel input_char], 107
   je .decrease_cursor
 
+  cmp byte[rel input_char], 13
+  je .update_todo_state
+
   jmp _main_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.update_todo_state:
+  movzx r9, byte[rel todos_cursor]
+  lea r11, [rel todos_content]
+  mov r12, 0
+  jmp .compare_cursor_state_update
+
+.increase_update_state_cursor:
+  inc r12
+  inc r11
+
+.compare_cursor_state_update:
+  cmp r12, r9
+  je .content_todo_state_update
+
+.update_todo_loop:
+  mov al, [r11]
+  cmp al, 10
+  je .increase_update_state_cursor
+
+  cmp al, 0
+  je .update_todo_state_done
+
+  inc r11
+  jmp .update_todo_loop
+
+.content_todo_state_update:
+  ;; content
+  ;;|> [X] title
+  ;;|> [ ] title
+  ;; ^
+  ;; r11
+
+  add r11, 3
+  ;;|> [ ] title
+  ;;|> [X] title
+  ;;    ^
+  ;;    r11
+  mov al, [r11]
+  cmp al, 32
+  je .content_todo_state_set_done
+
+  jmp .content_todo_state_set_undone
+
+.content_todo_state_set_done:
+  mov [r11], 88
+  jmp .update_todo_state_done
+
+.content_todo_state_set_undone:
+  mov [r11], 32
+
+.update_todo_state_done:
+  jmp _main_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 .decrease_cursor:
   movzx r9, byte[rel todos_cursor]
@@ -173,6 +233,8 @@ _main_loop:
   call _update_cursor_content
   jmp _main_loop
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 .increase_cursor:
   movzx r9, byte[rel todos_cursor]
   mov rdi , r9
@@ -180,6 +242,8 @@ _main_loop:
   mov [rel todos_cursor], r9b
   call _update_cursor_content
   jmp _main_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; update cursor in the UI
 ;; rdi => old cursor
@@ -220,6 +284,8 @@ _update_cursor_content:
 
 .cursor_done:
   ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 _load_todos_content:
   ;; state... title
@@ -299,6 +365,8 @@ _load_todos_content:
 
 .parsing_done:
   ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Check if a file error is due to file not existing
 ; Create it if so
