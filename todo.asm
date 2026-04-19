@@ -163,6 +163,9 @@ _main_loop:
   cmp byte[rel input_char], 13
   je .update_todo_state
 
+  cmp byte[rel input_char], 111
+  je .update_todo_state
+
   jmp _main_loop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
