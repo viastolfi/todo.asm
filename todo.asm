@@ -8,6 +8,9 @@ section .data
   file_opening_error_msg db "Error while opening db file", 10
   file_opening_error_len equ $ - file_opening_error_msg
 
+  helper_msg db "[q] - quit | [a] - add TODO | [j/k] - move | [o/Enter] - change TODO state"
+  helper_len equ $ - helper_msg
+
   file_extension db ".db", 0
 
   clear_term_msg db 27,"[2J",27,"[H"
@@ -157,6 +160,8 @@ _main_loop:
   funcall1 _strlen, todos_content
   mov r12, rax
   syscall3 SYS_WRITE, 1, todos_content, r12
+  syscall3 SYS_WRITE, 1, newline, 1
+  syscall3 SYS_WRITE, 1, helper_msg, helper_len
 
   syscall3 SYS_READ, STDIN_FILENO, input_char, 1
   cmp byte[rel input_char], 113
