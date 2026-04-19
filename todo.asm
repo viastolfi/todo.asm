@@ -197,19 +197,29 @@ _main_loop:
   funcall1 _strlen, r10
   mov r11, rax
 
+  cmp r11, 0
+  jne .add_new_line
+
+  funcall2 _strcat, r12, selected_todos_msg
+  jmp .write_new_todo
+
+.add_new_line:
   add r10, r11
   mov byte [r10], 10
   inc r10
   mov byte [r10], 0
-
   funcall2 _strcat, r12, none_selected_todos_msg
+
+.write_new_todo:
   funcall2 _strcat, r12, open_state_msg
   funcall2 _strcat, r12, input_todo_title
 
   funcall1 _strlen, r12
   mov r9, rax
   mov byte [r12 + r9 - 1], 0
+
 .add_new_todo_done:
+  inc [rel db_line]
   syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
   set_termios raw_termios
   jmp _main_loop
@@ -349,6 +359,9 @@ _load_todos_content:
 
   lea r9, [rel db_content] ; store the beginning of the content
   mov r12, 0  ; parsing cursor
+
+  cmp [rel db_size], 0
+  je .parsing_done
 
 .cursor_parsing:
   cmp [rel todos_cursor], r12
