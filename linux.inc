@@ -11,6 +11,7 @@
 %define SYS_CLOSE       3
 %define SYS_READ        0
 %define SYS_IOCTL       16
+%define SYS_LSEEK        8
 
 ; Flags
 

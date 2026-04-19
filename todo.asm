@@ -49,6 +49,8 @@ section .bss
   db_name resb        256
   db_content resb     256
   db_size resq        1
+  db_fd resq 1
+
   input_char resb     1
 
   todos_cursor  resb  1
@@ -86,9 +88,9 @@ _start:
 
 .db_file_reading:
   ;store the file descriptor
-  mov [rsp + 8], rax
+  mov [rel db_fd], rax
   ;read the content of the file
-  syscall3 SYS_READ, [rsp + 8], db_content, 256
+  syscall3 SYS_READ, [rel db_fd], db_content, 256
   ;store the size of the content
   mov [rel db_size], rax
 
@@ -369,6 +371,87 @@ _load_todos_content:
 .parsing_done:
   ret
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+_save_todo_content_2_db:
+  lea r8, [rel db_content]
+  mov r14, r8
+
+.reset_db_string:
+  mov al, [r8]
+  cmp al, 0
+  je .save_seek
+
+  mov byte[r8], 0
+  inc r8
+  jmp .reset_db_string
+
+.save_seek:
+  syscall3 SYS_LSEEK, [rel db_fd], 0, 0
+  lea r8, [rel db_content]
+  lea r9, [rel todos_content]
+
+.save_todo_parse_state:
+  mov al, [r9]
+  cmp al, 0
+  je .save_todo_done
+
+  add r9, 3 ;move to state character
+  mov al, [r9]
+  cmp al, 32
+  je .save_undo_state
+
+  cmp al, 88
+  je .save_done_state
+
+.save_undo_state:
+  mov byte [r8], 48
+  inc r8
+  mov byte [r8], 0
+  jmp .save_todo_parse_title
+
+.save_done_state:
+  mov byte [r8], 49
+  inc r8
+  mov byte [r8], 0
+
+.save_todo_parse_title:
+  add r9, 3
+  mov r12, r9
+
+.save_todo_parse_title_loop:
+  mov al, [r9]
+  cmp al, 10
+  je .save_todo_title_newline 
+
+  cmp al, 0
+  je .save_todo_title_end
+
+  inc r9
+  jmp .save_todo_parse_title_loop
+
+.save_todo_title_newline:
+  mov byte [r9], 0
+  funcall2 _strcat, r8, r12
+
+  funcall1 _strlen, r8
+  add r8, rax
+
+  mov byte [r8], 10
+  inc r8
+  mov byte [r8], 0
+
+  inc r9
+  jmp .save_todo_parse_state
+  
+.save_todo_title_end:
+  funcall2 _strcat, r8, r12 
+.save_todo_done:
+  funcall1 _strlen, r14
+  mov r13, rax
+  syscall3 SYS_WRITE, [rel db_fd], r14, r13
+  ret
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; Check if a file error is due to file not existing
@@ -396,9 +479,9 @@ _program_end_error:
   syscall1 SYS_EXIT, 1
 
 _program_end:
-  ;TODO: maybe store db_fd in bss section to avoid stack usage error
-  ;close the file
-  syscall1 SYS_CLOSE, [rsp + 8]
+  call _save_todo_content_2_db
+
+  syscall1 SYS_CLOSE, [rel db_fd]
 
   ;show cursor
   syscall3 SYS_WRITE, 1, show_cursor_msg, show_cursor_len
