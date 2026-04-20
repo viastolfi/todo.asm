@@ -149,9 +149,9 @@ _start:
   ;hide cursor
   syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
 
-  mov [rel db_line], 0
+  mov byte [rel db_line], 0
   call _load_todos_content
-  mov [rel todos_cursor], 0
+  mov byte [rel todos_cursor], 0
   call _main_loop
 
 _main_loop:
@@ -224,7 +224,7 @@ _main_loop:
   mov byte [r12 + r9 - 1], 0
 
 .add_new_todo_done:
-  inc [rel db_line]
+  inc byte [rel db_line]
   syscall3 SYS_WRITE, 1, hide_cursor_msg, hide_cursor_len
   set_termios raw_termios
   jmp _main_loop
@@ -275,11 +275,11 @@ _main_loop:
   jmp .content_todo_state_set_undone
 
 .content_todo_state_set_done:
-  mov [r11], 88
+  mov byte [r11], 88
   jmp .update_todo_state_done
 
 .content_todo_state_set_undone:
-  mov [r11], 32
+  mov byte [r11], 32
 
 .update_todo_state_done:
   jmp _main_loop
@@ -342,11 +342,11 @@ _update_cursor_content:
   jmp .update_loop
 
 .add_cursor:
-  mov [r9], 62
+  mov byte [r9], 62
   jmp .update_loop
 
 .erase_cursor:
-  mov [r9], 32
+  mov byte [r9], 32
   jmp .update_loop
 
 .cursor_done:
@@ -365,7 +365,7 @@ _load_todos_content:
   lea r9, [rel db_content] ; store the beginning of the content
   mov r12, 0  ; parsing cursor
 
-  cmp [rel db_size], 0
+  cmp byte [rel db_size], 0
   je .parsing_done
 
 .cursor_parsing:
@@ -424,7 +424,7 @@ _load_todos_content:
   funcall2 _strcat, todos_content, r10
   funcall2 _strcat, todos_content, newline
 
-  inc [rel db_line]
+  inc byte [rel db_line]
   inc r9
   jmp .cursor_parsing
 
