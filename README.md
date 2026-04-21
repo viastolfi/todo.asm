@@ -18,3 +18,5 @@ some refs i'm using a lot while building this:
 - https://wiki.osdev.org/CPU_Registers_x86-64
 - https://filippo.io/linux-syscall-table/
 - https://cs.brown.edu/courses/cs033/docs/guides/x64_cheatsheet.pdf
+- https://www.officedaytime.com/simd512e/
+- https://www.chessprogramming.org/X86-64
