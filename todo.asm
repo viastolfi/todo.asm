@@ -182,6 +182,87 @@ _main_loop:
   cmp byte[rel input_char], 97
   je .add_new_todo
 
+  cmp byte[rel input_char], 100
+  je .delete_todo
+
+  jmp _main_loop
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.delete_todo:
+  lea r9, [rel todos_content]
+  mov r12, 0
+
+  cmp byte [rel db_line], 0
+  je .delete_last_line
+
+  jmp .delete_compare_cursor
+
+.delete_last_line:
+  mov al, byte [r9]
+  cmp al, 0
+  je .delete_done
+
+  mov byte [r9], 0
+  inc r9
+  jmp .delete_last_line
+
+.delete_increase_cursor:
+  inc r9
+  inc r12
+
+.delete_compare_cursor:
+  movzx r13, byte [rel todos_cursor]
+  cmp r13, r12
+  je .delete_todo_start
+
+  mov al, byte[r9]
+  cmp al, 10
+  je .delete_increase_cursor
+
+  inc r9
+  jmp .delete_compare_cursor
+
+.delete_todo_start:
+  mov r10, r9
+
+.find_end_of_line:
+  mov al, byte[r10]
+  cmp al, 10
+  je .found_end
+
+  cmp al, 0
+  je .delete_done
+
+  inc r10
+  jmp .find_end_of_line
+
+.found_end:
+  inc r10
+
+.shift_buffer: 
+  mov al, byte[r10]
+  mov byte[r9], al
+
+  cmp al, 0
+  je .delete_done_loop
+
+  inc r9
+  inc r10
+  jmp .shift_buffer
+
+.delete_done_loop:
+  inc r9
+  mov al, byte[r9]
+  cmp al, 0
+  je .delete_done
+
+  mov byte [r9], 0
+  inc r9
+  jmp .delete_done_loop
+
+.delete_done:
+  dec byte [rel db_line]
   jmp _main_loop
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -515,7 +596,14 @@ _save_todo_content_2_db:
 .save_todo_done:
   funcall1 _strlen, r14
   mov r13, rax
+
+  syscall3 SYS_FTRUNCATE, [rel db_fd], 0, 0
+  syscall3 SYS_LSEEK, [rel db_fd], 0, 0
+
+  cmp r13, 0
+  je .save_skip_write
   syscall3 SYS_WRITE, [rel db_fd], r14, r13
+.save_skip_write:
   ret
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
